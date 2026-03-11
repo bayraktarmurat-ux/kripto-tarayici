@@ -7,7 +7,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 st.set_page_config(
-page_title=“Kripto Sinyal Tarayıcı”,
+page_title="Kripto Sinyal Tarayıcı",
+
 page_icon=“🪙”,
 layout=“wide”,
 initial_sidebar_state=“expanded”,
