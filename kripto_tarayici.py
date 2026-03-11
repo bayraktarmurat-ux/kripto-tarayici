@@ -7,8 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 st.set_page_config(
-page_title="Kripto Sinyal Tarayıcı",
-
+page_title=“Kripto Sinyal Tarayici”,
 page_icon=“🪙”,
 layout=“wide”,
 initial_sidebar_state=“expanded”,
@@ -128,11 +127,11 @@ portfoy = st.sidebar.number_input(
 “Portföy (USDT)”, min_value=100, max_value=1000000, value=10000, step=100
 )
 risk_yuzde = st.sidebar.slider(“Risk %”, 0.5, 5.0, 1.0, 0.5)
-rr_katsayi = st.sidebar.slider(“R:R Katsayısı”, 1.0, 5.0, 2.5, 0.5)
-atr_katsayi = st.sidebar.slider(“ATR Katsayısı”, 0.5, 3.0, 1.5, 0.5)
+rr_katsayi = st.sidebar.slider(“R:R Katsayisi”, 1.0, 5.0, 2.5, 0.5)
+atr_katsayi = st.sidebar.slider(“ATR Katsayisi”, 0.5, 3.0, 1.5, 0.5)
 atr_periyot = st.sidebar.slider(“ATR Periyodu”, 7, 21, 14, 1)
 ema_tolerans = st.sidebar.slider(“EMA Tolerans %”, 0.5, 5.0, 2.0, 0.5)
-stok_esik = st.sidebar.slider(“Stokastik Eşik”, 10, 40, 20, 5)
+stok_esik = st.sidebar.slider(“Stokastik Esik”, 10, 40, 20, 5)
 coin_limit = st.sidebar.slider(“Taranacak Coin Sayısı”, 50, 500, 200, 50)
 
 params = {
@@ -145,21 +144,21 @@ params = {
 
 # ─── ANA SAYFA ────────────────────────────────────────────────────────────────
 
-st.title(“🪙 Kripto Sinyal Tarayıcı”)
-st.caption(“EMA20>50>100>200 + Stokastik Kesişim + EMA Destek | Binance USDT çiftleri”)
+st.title(“🪙 Kripto Sinyal Tarayici”)
+st.caption(“EMA20>50>100>200 + Stokastik Kesişim + EMA Destek | Binance USDT ciftleri”)
 
 if st.button(“🔍 Tara”, use_container_width=True, type=“primary”):
 risk_usdt = portfoy * risk_yuzde / 100
 sinyaller = []
 
 ```
-with st.spinner("Coin listesi alınıyor..."):
+with st.spinner("Coin listesi aliniyor..."):
     coinler = coin_listesi_cek(coin_limit)
 
 if not coinler:
-    st.error("Binance'e bağlanılamadı.")
+    st.error("Binance'e baglanılamadi.")
 else:
-    progress = st.progress(0, text="Tarama başlıyor...")
+    progress = st.progress(0, text="Tarama basliyor...")
     toplam = len(coinler)
 
     for i, symbol in enumerate(coinler):
@@ -208,14 +207,14 @@ sinyaller = st.session_state[“kripto_sinyaller”]
 tarih     = st.session_state[“kripto_tarih”]
 
 ```
-st.markdown(f"### Tarama Sonuçları — {tarih}")
+st.markdown(f"### Tarama Sonuclari — {tarih}")
 
 col1, col2 = st.columns(2)
 col1.metric("Sinyal Sayısı", len(sinyaller))
 col2.metric("Portföy", str(portfoy) + " USDT")
 
 if len(sinyaller) == 0:
-    st.warning("Sinyal bulunamadı.")
+    st.warning("Sinyal bulunamadi.")
 else:
     df_sonuc = pd.DataFrame(sinyaller).sort_values("%K")
     st.dataframe(df_sonuc, use_container_width=True, hide_index=True)
@@ -231,7 +230,7 @@ else:
     st.markdown("---")
     st.markdown("### 📊 Grafik")
 
-    secili = st.selectbox("Coin seçin:", [r["Coin"] for r in sinyaller])
+    secili = st.selectbox("Coin secin:", [r["Coin"] for r in sinyaller])
     symbol = secili + "USDT"
 
     df_grafik = veri_cek(symbol, limit=150)
@@ -304,4 +303,3 @@ else:
         fig.update_xaxes(gridcolor="#1e293b")
 
         st.plotly_chart(fig, use_container_width=True)
-```
