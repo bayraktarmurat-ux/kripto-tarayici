@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
@@ -14,333 +15,288 @@ st.set_page_config(
 )
 
 # ─── KRİPTO LİSTELERİ ─────────────────────────────────────────────────────────
-# yfinance sembol formatı: BTC-USD (içsel), görüntüleme: BTCUSDT
-# Tüm semboller "-USD" suffix'i ile tanımlanır, TradingView linklerinde USDT'ye çevrilir.
-
-# Yüksek hacimli / güvenilir büyük kriptolar (TOP tier)
 TOP_KRIPTO = {
-    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
-    "ADA-USD", "AVAX-USD", "DOT-USD", "MATIC-USD", "LINK-USD",
-    "LTC-USD", "ATOM-USD", "UNI-USD", "NEAR-USD", "APT-USD",
-    "OP-USD",  "ARB-USD",  "INJ-USD", "SUI-USD",  "TIA-USD",
+    "BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD",
+    "ADA-USD","AVAX-USD","DOT-USD","MATIC-USD","LINK-USD",
+    "LTC-USD","ATOM-USD","UNI-USD","NEAR-USD","APT-USD",
+    "OP-USD","ARB-USD","INJ-USD","SUI-USD","TIA-USD",
 }
 
 def usdt_goster(sembol):
-    """BTC-USD → BTCUSDT görüntüleme formatı"""
     return sembol.replace("-USD", "USDT")
 
 def tv_link(sembol):
-    """TradingView linki için USDT formatına çevir"""
     return f"https://tr.tradingview.com/chart/?symbol={usdt_goster(sembol)}"
 
-# Taranacak tüm kripto listesi (~210 coin, yfinance'de çalışan semboller)
 KRIPTOLAR = [
-    # ── Layer 1 / Büyük Cap ──────────────────────────────────────────────────
-    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
-    "ADA-USD", "AVAX-USD", "DOT-USD", "TRX-USD", "TON-USD",
-    "MATIC-USD", "LTC-USD", "ATOM-USD", "NEAR-USD", "APT-USD",
-    "ICP-USD", "HBAR-USD", "FIL-USD", "ETC-USD", "BCH-USD",
-    "XLM-USD", "ALGO-USD", "VET-USD", "EGLD-USD", "FTM-USD",
-    "ONE-USD", "ZIL-USD", "ICX-USD", "WAVES-USD", "KAVA-USD",
-    "CELO-USD", "FLOW-USD", "MINA-USD", "KSM-USD", "CSPR-USD",
-
-    # ── Layer 2 / Ölçeklendirme ──────────────────────────────────────────────
-    "OP-USD", "ARB-USD", "IMX-USD", "LRC-USD", "METIS-USD",
-    "BOBA-USD", "SYS-USD", "STRK-USD",
-
-    # ── DeFi ─────────────────────────────────────────────────────────────────
-    "LINK-USD", "UNI-USD", "AAVE-USD", "MKR-USD", "SNX-USD",
-    "COMP-USD", "CRV-USD", "LDO-USD", "GRT-USD", "1INCH-USD",
-    "DYDX-USD", "GMX-USD", "BAL-USD", "SUSHI-USD", "YFI-USD",
-    "CAKE-USD", "RUNE-USD", "OSMO-USD", "INJ-USD", "PENDLE-USD",
-    "JOE-USD", "SPELL-USD", "CVX-USD", "FXS-USD", "FRAX-USD",
-    "ANKR-USD", "BAND-USD", "NMR-USD", "KNC-USD", "ZRX-USD",
-
-    # ── Yapay Zeka / Veri ────────────────────────────────────────────────────
-    "FET-USD", "OCEAN-USD", "AGIX-USD", "NMR-USD", "RLC-USD",
-    "TAO-USD", "RNDR-USD", "WLD-USD", "ARKM-USD", "CTXC-USD",
-
-    # ── Oyun / Metaverse / NFT ───────────────────────────────────────────────
-    "SAND-USD", "MANA-USD", "AXS-USD", "ENJ-USD", "CHZ-USD",
-    "GALA-USD", "BLUR-USD", "APE-USD", "ILV-USD", "GODS-USD",
-    "SLP-USD", "ALICE-USD", "TLM-USD", "PYR-USD", "SUPER-USD",
-    "HERO-USD", "SKILL-USD",
-
-    # ── Altyapı / Depolama / Ağ ──────────────────────────────────────────────
-    "AR-USD", "SC-USD", "STORJ-USD", "HNT-USD", "POWR-USD",
-    "GLM-USD", "REQ-USD", "DIA-USD", "API3-USD", "TRB-USD",
-    "UMA-USD", "CELR-USD", "SKL-USD", "KEEP-USD", "NU-USD",
-
-    # ── Gizlilik ─────────────────────────────────────────────────────────────
-    "XMR-USD", "ZEC-USD", "DASH-USD", "SCRT-USD", "ROSE-USD",
-
-    # ── Borsalar / CeFi ──────────────────────────────────────────────────────
-    "CRO-USD", "OKB-USD", "GT-USD", "HT-USD", "KCS-USD",
-    "MX-USD", "BGB-USD",
-
-    # ── Cosmos Ekosistemi ────────────────────────────────────────────────────
-    "OSMO-USD", "JUNO-USD", "EVMOS-USD", "STARS-USD", "CMDX-USD",
-
-    # ── Solana Ekosistemi ────────────────────────────────────────────────────
-    "SUI-USD", "SEI-USD", "TIA-USD", "BONK-USD", "JTO-USD",
-    "PYTH-USD", "WIF-USD", "BOME-USD", "POPCAT-USD",
-
-    # ── Yeni Nesil L1 ────────────────────────────────────────────────────────
-    "SUI-USD", "APT-USD", "SEI-USD", "MONAD-USD", "BERACHAIN-USD",
-
-    # ── Stablecoin Altyapısı / RWA ───────────────────────────────────────────
-    "ONDO-USD", "CFG-USD", "MPL-USD", "TRU-USD", "CREDIT-USD",
-
-    # ── Köprü / Birlikte Çalışabilirlik ──────────────────────────────────────
-    "REN-USD", "MULTI-USD", "STG-USD", "SYN-USD", "HOP-USD",
-
-    # ── Oracle ───────────────────────────────────────────────────────────────
-    "LINK-USD", "BAND-USD", "TRB-USD", "API3-USD", "DIA-USD",
-
-    # ── Meme ─────────────────────────────────────────────────────────────────
-    "DOGE-USD", "SHIB-USD", "FLOKI-USD", "PEPE-USD",
-    "BONK-USD", "WIF-USD", "BOME-USD", "MEME-USD",
-    "TURBO-USD", "LADYS-USD", "BABYDOGE-USD",
-
-    # ── Diğer Önemli ─────────────────────────────────────────────────────────
-    "XTZ-USD", "EOS-USD", "THETA-USD", "AXL-USD", "PYTH-USD",
-    "JUP-USD", "W-USD", "PORTAL-USD", "ALT-USD", "ETHFI-USD",
-    "REZ-USD", "OMNI-USD", "SAGA-USD", "ZK-USD", "ZETA-USD",
-    "IO-USD", "ZRO-USD", "LISTA-USD", "RENDER-USD",
-    # ── Ek Coinler (200+ hedefi) ─────────────────────────────────────────────
-    "JASMY-USD", "ACH-USD", "DENT-USD", "HOT-USD",
-    "IOTA-USD", "QTUM-USD", "ONT-USD", "ZEN-USD", "RVN-USD",
-    "BTT-USD", "WIN-USD", "SXP-USD", "ORN-USD",
-    "RAD-USD", "OGN-USD", "POLS-USD", "QUICK-USD",
-    "SFP-USD", "TWT-USD", "ALPHA-USD", "DODO-USD",
-    "CHESS-USD", "AUCTION-USD", "FIDA-USD", "MAPS-USD",
-    "OXY-USD", "MEDIA-USD", "STEP-USD", "SLIM-USD",
-    "MNGO-USD", "RAY-USD", "SRM-USD", "COPE-USD",
+    "BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD",
+    "ADA-USD","AVAX-USD","DOT-USD","TRX-USD","TON-USD",
+    "MATIC-USD","LTC-USD","ATOM-USD","NEAR-USD","APT-USD",
+    "ICP-USD","HBAR-USD","FIL-USD","ETC-USD","BCH-USD",
+    "XLM-USD","ALGO-USD","VET-USD","EGLD-USD","FTM-USD",
+    "ONE-USD","ZIL-USD","KAVA-USD","CELO-USD","FLOW-USD",
+    "MINA-USD","KSM-USD","OP-USD","ARB-USD","IMX-USD",
+    "LRC-USD","STRK-USD","LINK-USD","UNI-USD","AAVE-USD",
+    "MKR-USD","SNX-USD","COMP-USD","CRV-USD","LDO-USD",
+    "GRT-USD","1INCH-USD","DYDX-USD","GMX-USD","BAL-USD",
+    "SUSHI-USD","RUNE-USD","INJ-USD","PENDLE-USD","CAKE-USD",
+    "FET-USD","OCEAN-USD","AGIX-USD","TAO-USD","RNDR-USD",
+    "WLD-USD","ARKM-USD","SAND-USD","MANA-USD","AXS-USD",
+    "ENJ-USD","CHZ-USD","GALA-USD","BLUR-USD","APE-USD",
+    "ILV-USD","SLP-USD","ALICE-USD","AR-USD","STORJ-USD",
+    "HNT-USD","GLM-USD","API3-USD","TRB-USD","UMA-USD",
+    "XMR-USD","ZEC-USD","DASH-USD","ROSE-USD","CRO-USD",
+    "SUI-USD","SEI-USD","TIA-USD","BONK-USD","JTO-USD",
+    "PYTH-USD","WIF-USD","BOME-USD","ONDO-USD","STG-USD",
+    "DOGE-USD","SHIB-USD","FLOKI-USD","PEPE-USD","MEME-USD",
+    "XTZ-USD","EOS-USD","THETA-USD","AXL-USD","JUP-USD",
+    "RENDER-USD","ZETA-USD","ZK-USD","IO-USD","ZRO-USD",
+    "JASMY-USD","DENT-USD","HOT-USD","IOTA-USD","QTUM-USD",
+    "ONT-USD","ZEN-USD","RVN-USD","OGN-USD","QUICK-USD",
+    "TWT-USD","ALPHA-USD","DODO-USD","RAY-USD","ANKR-USD",
+    "BAND-USD","KNC-USD","ZRX-USD","NMR-USD","YFI-USD",
+    "CVX-USD","FXS-USD","OSMO-USD","SCRT-USD","CELR-USD",
 ]
-
-# Tekrarları kaldır, sırayı koru
 KRIPTOLAR = list(dict.fromkeys(KRIPTOLAR))
 
-# ─── ZAMAN ARALIĞI AYARLARI ───────────────────────────────────────────────────
+# ─── ZAMAN ARALIĞI ────────────────────────────────────────────────────────────
 INTERVAL_SECENEKLER = {
-    "1 Saatlik (1h)":   {"interval": "1h",  "period": "60d",  "min_bar": 100},
-    "4 Saatlik (4h)":   {"interval": "4h",  "period": "180d", "min_bar": 80},
-    "Günlük (1d)":      {"interval": "1d",  "period": "365d", "min_bar": 60},
-    "Haftalık (1w)":    {"interval": "1wk", "period": "730d", "min_bar": 40},
+    "1 Saatlik (1h)":  {"interval": "1h",  "period": "60d",  "min_bar": 100},
+    "4 Saatlik (4h)":  {"interval": "4h",  "period": "180d", "min_bar": 80},
+    "Günlük (1d)":     {"interval": "1d",  "period": "365d", "min_bar": 60},
+    "Haftalık (1w)":   {"interval": "1wk", "period": "730d", "min_bar": 40},
 }
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
-def to_series(x, idx=None):
-    """
-    Her türlü girişi (DataFrame, MultiIndex, Series, ndarray)
-    düz 1-boyutlu float pandas Series'e çevirir.
-    """
-    import numpy as np
-    # ndarray veya liste ise direkt Series yap
-    if isinstance(x, np.ndarray):
-        return pd.Series(x.flatten(), index=idx)
-    # DataFrame ise ilk sütunu al
+def s(x):
+    """Her türlü yfinance çıktısını düz float Series'e dönüştür."""
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
-    # squeeze ile boyut düşür
     if hasattr(x, "squeeze"):
         x = x.squeeze()
-    # squeeze sonrası hâlâ DataFrame ise
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
-    # Son güvence: float Series döndür
     return pd.Series(x.values.flatten(), index=x.index, dtype=float)
 
-def ema(seri, periyot):
-    s = to_series(seri)
-    return pd.Series(
-        s.ewm(span=periyot, adjust=False).mean().values.flatten(),
-        index=s.index, dtype=float
-    )
+def ema_s(seri, n):
+    x = s(seri)
+    return pd.Series(x.ewm(span=n, adjust=False).mean().values.flatten(),
+                     index=x.index, dtype=float)
 
-def atr_hesapla(df, periyot=14):
-    close = to_series(df["Close"])
-    high  = to_series(df["High"])
-    low   = to_series(df["Low"])
-    hl = high - low
-    hc = (high - close.shift(1)).abs()
-    lc = (low  - close.shift(1)).abs()
-    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
-    atr = tr.ewm(span=periyot, adjust=False).mean()
-    return pd.Series(atr.values.flatten(), index=tr.index, dtype=float)
+def rsi_hesapla(close_s, n=14):
+    close_s = s(close_s)
+    delta   = close_s.diff()
+    gain    = delta.clip(lower=0)
+    loss    = (-delta).clip(lower=0)
+    avg_g   = gain.ewm(alpha=1/n, adjust=False).mean()
+    avg_l   = loss.ewm(alpha=1/n, adjust=False).mean()
+    rs      = avg_g / (avg_l + 1e-9)
+    return pd.Series((100 - 100 / (1 + rs)).values.flatten(),
+                     index=close_s.index, dtype=float)
+
+def atr_s(df_in, n=14):
+    c  = s(df_in["Close"]); h = s(df_in["High"]); l = s(df_in["Low"])
+    tr = pd.concat([h-l, (h-c.shift()).abs(), (l-c.shift()).abs()], axis=1).max(axis=1)
+    return pd.Series(tr.ewm(span=n, adjust=False).mean().values.flatten(),
+                     index=c.index, dtype=float)
 
 def veri_cek(ticker, interval_cfg):
-    """Kripto verisi çeker — semboller zaten BTC-USD formatında"""
     try:
-        interval = interval_cfg["interval"]
-        period   = interval_cfg["period"]
-        min_bar  = interval_cfg["min_bar"]
-
-        df = yf.download(
-            ticker,
-            period=period,
-            interval=interval,
-            progress=False,
-            auto_adjust=True,
-        )
-        if df.empty or len(df) < min_bar:
+        df = yf.download(ticker, period=interval_cfg["period"],
+                         interval=interval_cfg["interval"],
+                         progress=False, auto_adjust=True)
+        if df.empty or len(df) < interval_cfg["min_bar"]:
             return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df = df[["Open","High","Low","Close","Volume"]].dropna()
         for col in df.columns:
-            df[col] = to_series(df[col])
-        # Timezone kaldır (bazı aralıklarda tz-aware gelir)
+            df[col] = s(df[col])
         if hasattr(df.index, "tz") and df.index.tz is not None:
             df.index = df.index.tz_localize(None)
         return df
     except Exception:
         return None
 
-# ─── PAZAR FİLTRESİ (BTC Trend) ──────────────────────────────────────────────
+# ─── PAZAR FİLTRESİ ───────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600)
-def pazar_kontrol(interval_key):
-    """BTC son kapanış > EMA200 mi kontrol eder. 1 saat cache'ler."""
+def pazar_kontrol(interval_key, ema_uzun):
     try:
         cfg = INTERVAL_SECENEKLER[interval_key]
-        df  = yf.download(
-            "BTC-USD",
-            period=cfg["period"],
-            interval=cfg["interval"],
-            progress=False,
-            auto_adjust=True,
-        )
-        if df.empty:
-            return None, None, None, None
+        df  = yf.download("BTC-USD", period=cfg["period"],
+                          interval=cfg["interval"], progress=False, auto_adjust=True)
+        if df.empty: return None, None, None, None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        df["EMA200"] = df["Close"].ewm(span=200, adjust=False).mean()
-        df.dropna(subset=["EMA200"], inplace=True)
-        son      = df.iloc[-1]
-        kapanis  = float(son["Close"])
-        ema200   = float(son["EMA200"])
-        aktif    = kapanis > ema200
-        fark_pct = (kapanis - ema200) / ema200 * 100
-        return aktif, kapanis, ema200, fark_pct
+        c      = s(df["Close"])
+        ema200 = pd.Series(c.ewm(span=ema_uzun, adjust=False).mean().values.flatten(),
+                           index=c.index, dtype=float)
+        son_c  = float(c.iloc[-1]); son_e = float(ema200.iloc[-1])
+        return son_c > son_e, son_c, son_e, (son_c - son_e) / son_e * 100
     except Exception:
         return None, None, None, None
 
-# ─── SİNYAL TARAMA (MACD STRATEJİSİ) ─────────────────────────────────────────
+# ─── STRATEJİ: RSI + EMA TREND + HACİM BREAKOUT ──────────────────────────────
 def sinyal_tara(df, params):
     """
-    Strateji: Trend (EMA20 > EMA50 > EMA100 > EMA200) + MACD histogram negatiften pozitife dönüş
+    4 koşul aynı anda sağlanmalı:
+      1. EMA kısa > EMA uzun  → Trend yukarı
+      2. RSI_min < RSI < RSI_max → Momentum başlıyor, aşırı alım yok
+      3. Kapanış > son N barın en yüksek kapanışı → Breakout
+      4. Hacim > N-bar ort * katsayı → Güçlü katılım
     """
-    atr_per    = params["atr_periyot"]
-    atr_kat    = params["atr_katsayi"]
-    rr         = params["rr_katsayi"]
-    macd_hizli = params["macd_hizli"]
-    macd_yavas = params["macd_yavas"]
-    macd_sinyal= params["macd_sinyal"]
+    ema_kisa  = params["ema_kisa"];   ema_uzun   = params["ema_uzun"]
+    rsi_per   = params["rsi_periyot"]; rsi_min    = params["rsi_min"]
+    rsi_max   = params["rsi_max"];    brk_per    = params["breakout_periyot"]
+    hac_per   = params["hacim_periyot"]; hac_kat  = params["hacim_katsayi"]
+    atr_per   = params["atr_periyot"]; atr_kat   = params["atr_katsayi"]
+    rr        = params["rr_katsayi"]
 
-    df = df.copy()
-    for col in ["Open","High","Low","Close","Volume"]:
-        if col in df.columns:
-            df[col] = to_series(df[col])
+    try:
+        df = df.copy()
+        for col in ["Open","High","Low","Close","Volume"]:
+            if col in df.columns:
+                df[col] = s(df[col])
 
-    close = to_series(df["Close"])
-    df["EMA20"]  = ema(close, 20).values
-    df["EMA50"]  = ema(close, 50).values
-    df["EMA100"] = ema(close, 100).values
-    df["EMA200"] = ema(close, 200).values
-    df["ATR"]    = atr_hesapla(df, atr_per).values
+        close  = s(df["Close"])
+        volume = s(df["Volume"])
 
-    # MACD — her adımda .values ile ndarray'e indir, DataFrame oluşmasını engelle
-    ema_h = pd.Series(close.ewm(span=macd_hizli, adjust=False).mean().values.flatten(), index=close.index)
-    ema_y = pd.Series(close.ewm(span=macd_yavas, adjust=False).mean().values.flatten(), index=close.index)
-    macd_line        = ema_h - ema_y
-    macd_sig         = pd.Series(macd_line.ewm(span=macd_sinyal, adjust=False).mean().values.flatten(), index=close.index)
-    df["MACD"]     = macd_line.values
-    df["MACD_SIG"] = macd_sig.values
-    df["MACD_HIS"] = (macd_line - macd_sig).values
+        ema_k = ema_s(close, ema_kisa)
+        ema_u = ema_s(close, ema_uzun)
+        rsi   = rsi_hesapla(close, rsi_per)
+        atr   = atr_s(df, atr_per)
 
-    son    = df.iloc[-1]
-    onceki = df.iloc[-2]
+        # Breakout: son N barın en yüksek kapanışı (mevcut bar hariç)
+        brk_seviye = close.shift(1).rolling(brk_per).max()
+        # Hacim ortalaması (mevcut bar hariç)
+        hac_ort    = volume.shift(1).rolling(hac_per).mean()
 
-    # ── 1. TREND FİLTRESİ ─────────────────────────────────────────────────────
-    if not (float(son["EMA20"]) > float(son["EMA50"]) >
-            float(son["EMA100"]) > float(son["EMA200"])):
+        if len(df) < max(ema_uzun, brk_per, hac_per) + 5:
+            return None
+
+        son_close   = float(close.iloc[-1])
+        son_ema_k   = float(ema_k.iloc[-1])
+        son_ema_u   = float(ema_u.iloc[-1])
+        son_rsi     = float(rsi.iloc[-1])
+        son_brk     = float(brk_seviye.iloc[-1])
+        son_vol     = float(volume.iloc[-1])
+        son_hac_ort = float(hac_ort.iloc[-1])
+        son_atr     = float(atr.iloc[-1])
+
+        if any(np.isnan(v) for v in [son_ema_k, son_ema_u, son_rsi,
+                                      son_brk, son_hac_ort, son_atr]):
+            return None
+
+        # 1. Trend filtresi
+        if son_ema_k <= son_ema_u:
+            return None
+        # 2. RSI bandı
+        if not (rsi_min < son_rsi < rsi_max):
+            return None
+        # 3. Fiyat breakout
+        if son_close <= son_brk:
+            return None
+        # 4. Hacim onayı
+        if son_vol < son_hac_ort * hac_kat:
+            return None
+
+        stop  = round(son_close - atr_kat * son_atr, 8)
+        hedef = round(son_close + rr * atr_kat * son_atr, 8)
+        if son_close - stop <= 0:
+            return None
+
+        return {
+            "Son Kapanis": round(son_close, 8),
+            "RSI"        : round(son_rsi, 1),
+            "Hacim_Kat"  : round(son_vol / son_hac_ort, 2),
+            "EMA_Kisa"   : round(son_ema_k, 8),
+            "EMA_Uzun"   : round(son_ema_u, 8),
+            "Stop"       : stop,
+            "Stop%"      : round((son_close - stop) / son_close * 100, 2),
+            "Hedef"      : hedef,
+            "Hedef%"     : round((hedef - son_close) / son_close * 100, 2),
+            "ATR"        : round(son_atr, 8),
+        }
+    except Exception:
         return None
-
-    # ── 2. MACD: Histogram negatiften pozitife döndü ──────────────────────────
-    if not (float(onceki["MACD_HIS"]) < 0 and float(son["MACD_HIS"]) > 0):
-        return None
-
-    # ── İŞLEM DETAYLARI ───────────────────────────────────────────────────────
-    kapanis = float(son["Close"])
-    atr_val = float(son["ATR"])
-    stop    = round(kapanis - atr_kat * atr_val, 6)
-    hedef   = round(kapanis + rr * atr_kat * atr_val, 6)
-
-    return {
-        "Son Kapanis": round(kapanis, 6),
-        "MACD_HIS"   : round(float(son["MACD_HIS"]), 6),
-        "MACD"       : round(float(son["MACD"]), 6),
-        "Stop"       : stop,
-        "Stop%"      : round((kapanis - stop) / kapanis * 100, 2),
-        "Hedef"      : hedef,
-        "Hedef%"     : round((hedef - kapanis) / kapanis * 100, 2),
-        "ATR"        : round(atr_val, 6),
-    }
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 st.sidebar.title("⚙️ Ayarlar")
 
 st.sidebar.markdown("### ⏱️ Zaman Aralığı")
 interval_key = st.sidebar.selectbox(
-    "Zaman Dilimi",
-    options=list(INTERVAL_SECENEKLER.keys()),
-    index=1,   # Varsayılan: 4 Saatlik
+    "Zaman Dilimi", options=list(INTERVAL_SECENEKLER.keys()), index=1,
     help="Tarama ve grafik için kullanılacak mum aralığı"
 )
 interval_cfg = INTERVAL_SECENEKLER[interval_key]
 
 st.sidebar.markdown("### 💰 Portföy")
-portfoy = st.sidebar.number_input(
-    "Portföy (USD)", min_value=100, max_value=10_000_000,
-    value=10_000, step=100
-)
-risk_yuzde = st.sidebar.slider(
-    "Risk %", min_value=0.5, max_value=5.0, value=1.0, step=0.5
-)
-rr_katsayi = st.sidebar.slider(
-    "R:R Katsayısı", min_value=1.0, max_value=5.0, value=3.0, step=0.5
-)
-atr_katsayi = st.sidebar.slider(
-    "ATR Katsayısı", min_value=0.5, max_value=3.0, value=1.5, step=0.5
-)
-atr_periyot = st.sidebar.slider(
-    "ATR Periyodu", min_value=7, max_value=21, value=14, step=1
-)
+portfoy    = st.sidebar.number_input("Portföy (USD)", min_value=100,
+                                      max_value=10_000_000, value=10_000, step=100)
+risk_yuzde = st.sidebar.slider("Risk %", 0.5, 5.0, 1.0, 0.5)
+rr_katsayi = st.sidebar.slider("R:R Katsayısı", 1.0, 5.0, 2.0, 0.5)
 
-st.sidebar.markdown("### 📊 MACD")
-macd_hizli  = st.sidebar.slider("MACD Hızlı EMA", min_value=5,  max_value=20, value=12, step=1)
-macd_yavas  = st.sidebar.slider("MACD Yavaş EMA", min_value=10, max_value=50, value=26, step=1)
-macd_sinyal = st.sidebar.slider("MACD Sinyal",    min_value=5,  max_value=20, value=9,  step=1)
+st.sidebar.markdown("### 📈 EMA Trend")
+ema_kisa = st.sidebar.slider("EMA Kısa", 10, 100, 50, 5)
+ema_uzun = st.sidebar.slider("EMA Uzun", 50, 300, 200, 10)
+
+st.sidebar.markdown("### 📊 RSI")
+rsi_periyot = st.sidebar.slider("RSI Periyodu", 7, 21, 14, 1)
+rsi_min     = st.sidebar.slider("RSI Alt Sınır", 20, 60, 40, 5,
+                                 help="Bu değerin altındaki RSI'lar atlanır")
+rsi_max     = st.sidebar.slider("RSI Üst Sınır", 50, 85, 70, 5,
+                                 help="Bu değerin üstündeki RSI'lar atlanır (aşırı alım)")
+
+st.sidebar.markdown("### 🚀 Breakout")
+breakout_periyot = st.sidebar.slider("Breakout Periyodu (bar)", 5, 50, 20, 5,
+                                      help="Kaç barın en yüksek kapanışı kırılmalı?")
+
+st.sidebar.markdown("### 📦 Hacim")
+hacim_periyot = st.sidebar.slider("Hacim Ort. Periyodu", 5, 50, 20, 5)
+hacim_katsayi = st.sidebar.slider("Hacim Katsayısı", 1.0, 4.0, 1.5, 0.5,
+                                   help="Hacim, ortalamanın kaç katı olmalı?")
+
+st.sidebar.markdown("### 🛡️ ATR Stop")
+atr_katsayi = st.sidebar.slider("ATR Katsayısı", 1.0, 5.0, 2.0, 0.5,
+                                  help="Kripto için 2-3 arası önerilir")
+atr_periyot = st.sidebar.slider("ATR Periyodu", 7, 21, 14, 1)
 
 params = {
-    "atr_periyot" : atr_periyot,
-    "atr_katsayi" : atr_katsayi,
-    "rr_katsayi"  : rr_katsayi,
-    "macd_hizli"  : macd_hizli,
-    "macd_yavas"  : macd_yavas,
-    "macd_sinyal" : macd_sinyal,
+    "ema_kisa"         : ema_kisa,
+    "ema_uzun"         : ema_uzun,
+    "rsi_periyot"      : rsi_periyot,
+    "rsi_min"          : rsi_min,
+    "rsi_max"          : rsi_max,
+    "breakout_periyot" : breakout_periyot,
+    "hacim_periyot"    : hacim_periyot,
+    "hacim_katsayi"    : hacim_katsayi,
+    "atr_periyot"      : atr_periyot,
+    "atr_katsayi"      : atr_katsayi,
+    "rr_katsayi"       : rr_katsayi,
 }
 
 # ─── ANA SAYFA ────────────────────────────────────────────────────────────────
 st.title("🪙 Kripto Sinyal Tarayıcı")
-st.caption(f"BTC Trend Filtreli | EMA Trend | MACD Histogram Dönüşü | R:R 1:{rr_katsayi:.0f} | {interval_key}")
+st.caption(f"RSI + EMA Trend + Hacim Breakout | R:R 1:{rr_katsayi:.0f} | {interval_key}")
 
-# ─── PAZAR DURUMU (BTC FİLTRESİ) ──────────────────────────────────────────────
-pazar_sonuc = pazar_kontrol(interval_key)
-aktif       = pazar_sonuc[0]
-btc_fiyat   = pazar_sonuc[1]
-btc_ema200  = pazar_sonuc[2]
-btc_fark    = pazar_sonuc[3]
+with st.expander("ℹ️ Strateji Açıklaması", expanded=False):
+    st.markdown(f"""
+**RSI + EMA Trend + Hacim Breakout Stratejisi**
+
+Bir kripto aşağıdaki **4 koşulu aynı anda** sağladığında sinyal üretilir:
+
+| Koşul | Parametre | Açıklama |
+|---|---|---|
+| 📈 **Trend** | EMA{ema_kisa} > EMA{ema_uzun} | Ana trend yukarı yönlü |
+| 📊 **Momentum** | RSI {rsi_min}–{rsi_max} | Ne aşırı alım ne aşırı satım |
+| 🚀 **Breakout** | Kapanış > son {breakout_periyot} barın zirvesi | Direnç kırıldı |
+| 📦 **Hacim** | Hacim > {hacim_katsayi}x ortalama | Güçlü katılım var |
+
+**Stop:** ATR × {atr_katsayi} aşağıda &nbsp;|&nbsp; **Hedef:** Stop mesafesinin {rr_katsayi:.0f}x'i yukarıda
+""")
+
+# ─── PAZAR DURUMU ─────────────────────────────────────────────────────────────
+aktif, btc_fiyat, btc_ema_val, btc_fark = pazar_kontrol(interval_key, ema_uzun)
 
 if aktif is None:
     st.warning("⚠️ BTC verisi alınamadı — pazar filtresi devre dışı.")
@@ -348,75 +304,62 @@ if aktif is None:
 elif aktif:
     st.success(
         f"✅ **BTC Boğa Trendi** ({interval_key}) — "
-        f"BTC: ${btc_fiyat:,.2f}  |  EMA200: ${btc_ema200:,.2f}  |  "
-        f"Fark: **+{btc_fark:.1f}%** — Strateji aktif, tarama yapılabilir."
+        f"BTC: ${btc_fiyat:,.2f}  |  EMA{ema_uzun}: ${btc_ema_val:,.2f}  |  "
+        f"Fark: **+{btc_fark:.1f}%**"
     )
     pazar_gecti = True
 else:
     st.error(
-        f"🚫 **BTC EMA200 Altında** ({interval_key}) — "
-        f"BTC: ${btc_fiyat:,.2f}  |  EMA200: ${btc_ema200:,.2f}  |  "
-        f"Fark: **{btc_fark:.1f}%** — Strateji pasif, işlem önerilmez."
+        f"🚫 **BTC Ayı Trendi** ({interval_key}) — "
+        f"BTC: ${btc_fiyat:,.2f}  |  EMA{ema_uzun}: ${btc_ema_val:,.2f}  |  "
+        f"Fark: **{btc_fark:.1f}%** — Strateji pasif."
     )
     pazar_gecti = False
 
 st.markdown("---")
 
-# ─── BYPASS & TARA ────────────────────────────────────────────────────────────
-pazar_bypass = st.sidebar.checkbox(
-    "⚠️ Pazar filtresini atla", value=False,
-    help="BTC EMA200 altında olsa bile tarama yapılmasına izin verir."
-)
+pazar_bypass = st.sidebar.checkbox("⚠️ Pazar filtresini atla", value=False)
 tara_disabled = not pazar_gecti
 if pazar_bypass:
     tara_disabled = False
     st.warning("⚠️ Pazar filtresi devre dışı bırakıldı.")
 
-if st.button("🔍 Tara", use_container_width=True, type="primary",
-             disabled=tara_disabled):
-    risk_tl   = portfoy * risk_yuzde / 100
+if st.button("🔍 Tara", use_container_width=True, type="primary", disabled=tara_disabled):
+    risk_usd  = portfoy * risk_yuzde / 100
     sinyaller = []
     hatalar   = []
 
     progress = st.progress(0, text="Tarama başlıyor...")
-    toplam   = len(KRIPTOLAR)
-
     for i, kripto in enumerate(KRIPTOLAR):
-        progress.progress(
-            (i + 1) / toplam,
-            text=f"Taraniyor: {kripto} ({i+1}/{toplam})"
-        )
+        progress.progress((i+1)/len(KRIPTOLAR),
+                          text=f"Taraniyor: {usdt_goster(kripto)} ({i+1}/{len(KRIPTOLAR)})")
         df = veri_cek(kripto, interval_cfg)
         if df is None:
-            hatalar.append(kripto)
-            continue
+            hatalar.append(kripto); continue
         sonuc = sinyal_tara(df, params)
-        if sonuc is None:
-            continue
+        if sonuc is None: continue
 
         kapanis    = sonuc["Son Kapanis"]
         stop       = sonuc["Stop"]
-        risk_hisse = kapanis - stop
-        if risk_hisse <= 0:
-            continue
-        # Kripto için lot yerine miktar hesabı
-        miktar   = risk_tl / risk_hisse
+        risk_birim = kapanis - stop
+        if risk_birim <= 0: continue
+        miktar    = risk_usd / risk_birim
         giris_usd = round(miktar * kapanis, 2)
 
         sinyaller.append({
             "⭐"        : "⭐" if kripto in TOP_KRIPTO else "",
             "Kripto"   : kripto,
             "Fiyat"    : kapanis,
-            "MACD_HIS" : sonuc["MACD_HIS"],
-            "MACD"     : sonuc["MACD"],
+            "RSI"      : sonuc["RSI"],
+            "Hac.Kat"  : sonuc["Hacim_Kat"],
             "Stop"     : stop,
             "Stop%"    : sonuc["Stop%"],
             "Hedef"    : sonuc["Hedef"],
             "Hedef%"   : sonuc["Hedef%"],
             "ATR"      : sonuc["ATR"],
-            "Miktar"   : round(miktar, 4),
+            "Miktar"   : round(miktar, 6),
             "Giriş USD": giris_usd,
-            "Risk USD" : round(risk_tl, 2),
+            "Risk USD" : round(risk_usd, 2),
         })
 
     progress.empty()
@@ -424,6 +367,7 @@ if st.button("🔍 Tara", use_container_width=True, type="primary",
     st.session_state["hatalar"]      = hatalar
     st.session_state["tarih"]        = datetime.now().strftime("%d.%m.%Y %H:%M")
     st.session_state["interval_key"] = interval_key
+    st.session_state["params"]       = params
 
 # ─── SONUÇLAR ─────────────────────────────────────────────────────────────────
 if "sinyaller" in st.session_state:
@@ -431,199 +375,167 @@ if "sinyaller" in st.session_state:
     tarih        = st.session_state["tarih"]
     hatalar      = st.session_state.get("hatalar", [])
     son_interval = st.session_state.get("interval_key", interval_key)
+    p            = st.session_state.get("params", params)
 
     st.markdown(f"### Tarama Sonuçları — {tarih} | {son_interval}")
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Sinyal Sayısı",  len(sinyaller))
-    col2.metric("Taranan Kripto", len(KRIPTOLAR))
-    col3.metric("Veri Hatası",    len(hatalar))
-    col4.metric("Pazar",          "✅ Boğa" if pazar_gecti else "🚫 Ayı")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Sinyal Sayısı",  len(sinyaller))
+    c2.metric("Taranan Kripto", len(KRIPTOLAR))
+    c3.metric("Veri Hatası",    len(hatalar))
+    c4.metric("Pazar",          "✅ Boğa" if pazar_gecti else "🚫 Ayı")
 
-    if len(hatalar) > 0:
+    if hatalar:
         with st.expander(f"⚠️ Veri alınamayan {len(hatalar)} kripto"):
-            st.caption("Yahoo Finance'den veri çekilemedi. Sembol değişimi veya geçici bağlantı sorunu olabilir.")
             cols = st.columns(6)
             for i, k in enumerate(sorted(hatalar)):
                 cols[i % 6].markdown(f"[{usdt_goster(k)}]({tv_link(k)})")
 
-    if len(sinyaller) == 0:
-        st.warning("Seçilen zaman diliminde kriterlere uyan kripto bulunamadı.")
+    if not sinyaller:
+        st.warning("Seçilen parametrelerle sinyal bulunamadı. "
+                   "RSI aralığını genişletmeyi veya Breakout periyodunu azaltmayı deneyin.")
     else:
         df_sonuc = pd.DataFrame(sinyaller).sort_values(
-            by=["⭐", "MACD_HIS"], ascending=[False, False]
+            by=["⭐","Hac.Kat"], ascending=[False, False]
         )
 
         top_var = df_sonuc[df_sonuc["⭐"] == "⭐"]
-        if len(top_var) > 0:
+        if len(top_var):
             st.success(
-                f"⭐ **{len(top_var)} kripto büyük cap listesinde!** "
-                f"({', '.join(top_var['Kripto'].apply(usdt_goster).tolist())}) — Yüksek likidite, öncelikli değerlendir."
+                f"⭐ **{len(top_var)} büyük cap!** "
+                f"({', '.join(top_var['Kripto'].apply(usdt_goster).tolist())})"
             )
 
         df_goster = df_sonuc.copy()
-        df_goster["Stop%"]  = df_goster["Stop%"].apply(lambda x: f"-%{x}")
-        df_goster["Hedef%"] = df_goster["Hedef%"].apply(lambda x: f"+%{x}")
-        # Kripto sütununu USDT formatında göster
-        df_goster["Kripto"] = df_goster["Kripto"].apply(usdt_goster)
+        df_goster["Kripto"]    = df_goster["Kripto"].apply(usdt_goster)
+        df_goster["Stop%"]     = df_goster["Stop%"].apply(lambda x: f"-%{x}")
+        df_goster["Hedef%"]    = df_goster["Hedef%"].apply(lambda x: f"+%{x}")
         df_goster["📈 Grafik"] = df_sonuc["Kripto"].apply(tv_link)
 
-        st.dataframe(
-            df_goster,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "📈 Grafik": st.column_config.LinkColumn(
-                    "📈 Grafik",
-                    help="TradingView'da aç",
-                    display_text="TradingView →"
-                )
-            }
-        )
+        st.dataframe(df_goster, use_container_width=True, hide_index=True,
+                     column_config={"📈 Grafik": st.column_config.LinkColumn(
+                         "📈 Grafik", display_text="TradingView →")})
 
-        # Özet
-        toplam_giris = df_sonuc["Giriş USD"].sum()
-        toplam_risk  = df_sonuc["Risk USD"].sum()
         c1, c2 = st.columns(2)
-        c1.metric("Toplam Sermaye Kullanımı", f"${toplam_giris:,.2f}")
+        c1.metric("Toplam Sermaye Kullanımı", f"${df_sonuc['Giriş USD'].sum():,.2f}")
         c2.metric("Toplam Risk",
-                  f"${toplam_risk:,.2f}  (%{toplam_risk/portfoy*100:.1f} portföy)")
+                  f"${df_sonuc['Risk USD'].sum():,.2f}  "
+                  f"(%{df_sonuc['Risk USD'].sum()/portfoy*100:.1f} portföy)")
 
-        # CSV indir
         csv = df_sonuc.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="⬇️ CSV İndir",
-            data=csv,
-            file_name="kripto_sinyaller_" + datetime.now().strftime("%Y%m%d_%H%M") + ".csv",
-            mime="text/csv",
-        )
+        st.download_button("⬇️ CSV İndir", data=csv,
+            file_name=f"kripto_sinyaller_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv")
 
         st.markdown("---")
         st.markdown("### 📊 Grafik")
 
-        # Selectbox: USDT formatında göster, ama iç değer -USD olarak kalsın
-        sinyal_map = {usdt_goster(r["Kripto"]): r["Kripto"] for r in sinyaller}
+        sinyal_map   = {usdt_goster(r["Kripto"]): r["Kripto"] for r in sinyaller}
         secili_label = st.selectbox("Kripto seçin:", list(sinyal_map.keys()))
-        secili = sinyal_map[secili_label]
-        df_grafik = veri_cek(secili, interval_cfg)
+        secili       = sinyal_map[secili_label]
+        df_grafik    = veri_cek(secili, interval_cfg)
+        sel_sin      = next(r for r in sinyaller if r["Kripto"] == secili)
 
         if df_grafik is not None:
-            c = df_grafik["Close"].squeeze() if hasattr(df_grafik["Close"], "squeeze") else df_grafik["Close"]
-            df_grafik["EMA20"]  = ema(df_grafik["Close"], 20)
-            df_grafik["EMA50"]  = ema(df_grafik["Close"], 50)
-            df_grafik["EMA100"] = ema(df_grafik["Close"], 100)
-            df_grafik["EMA200"] = ema(df_grafik["Close"], 200)
-            ema_h = c.ewm(span=macd_hizli, adjust=False).mean()
-            ema_y = c.ewm(span=macd_yavas, adjust=False).mean()
-            df_grafik["MACD"]     = ema_h - ema_y
-            df_grafik["MACD_SIG"] = df_grafik["MACD"].ewm(span=macd_sinyal, adjust=False).mean()
-            df_grafik["MACD_HIS"] = df_grafik["MACD"] - df_grafik["MACD_SIG"]
-
-            secili_sinyal = next(r for r in sinyaller if r["Kripto"] == secili)
+            c_g     = s(df_grafik["Close"])
+            v_g     = s(df_grafik["Volume"])
+            ema_k_g = ema_s(c_g, p["ema_kisa"])
+            ema_u_g = ema_s(c_g, p["ema_uzun"])
+            rsi_g   = rsi_hesapla(c_g, p["rsi_periyot"])
+            hac_g   = v_g.rolling(p["hacim_periyot"]).mean()
 
             fig = make_subplots(
-                rows=2, cols=1, shared_xaxes=True,
-                row_heights=[0.7, 0.3], vertical_spacing=0.04
+                rows=3, cols=1, shared_xaxes=True,
+                row_heights=[0.55, 0.25, 0.20],
+                vertical_spacing=0.03,
+                subplot_titles=["Fiyat & EMA", "RSI", "Hacim"]
             )
 
-            # Mum grafik
             fig.add_trace(go.Candlestick(
                 x=df_grafik.index,
-                open=df_grafik["Open"], high=df_grafik["High"],
-                low=df_grafik["Low"],   close=df_grafik["Close"],
+                open=s(df_grafik["Open"]), high=s(df_grafik["High"]),
+                low=s(df_grafik["Low"]),   close=c_g,
                 name="Fiyat",
                 increasing_line_color="#22c55e",
                 decreasing_line_color="#ef4444",
             ), row=1, col=1)
 
-            # EMA çizgileri
-            for col_name, renk, genislik in [
-                ("EMA20","#38bdf8",1.5), ("EMA50","#f59e0b",1.5),
-                ("EMA100","#a78bfa",1),  ("EMA200","#f472b6",1),
+            for vals, renk, isim in [
+                (ema_k_g, "#38bdf8", f"EMA{p['ema_kisa']}"),
+                (ema_u_g, "#f472b6", f"EMA{p['ema_uzun']}"),
             ]:
-                fig.add_trace(go.Scatter(
-                    x=df_grafik.index, y=df_grafik[col_name],
-                    name=col_name, line=dict(color=renk, width=genislik)
-                ), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df_grafik.index, y=vals,
+                    name=isim, line=dict(color=renk, width=1.5)), row=1, col=1)
 
-            # Stop ve hedef çizgileri
             son_tarih = df_grafik.index[-1]
-            # Kripto 7/24 açık — offset olarak timedelta kullan
-            interval_map = {"1h": 24, "4h": 6, "1d": 1, "1wk": 1}
-            gun_say = interval_map.get(interval_cfg["interval"], 1)
-            bitis   = son_tarih + timedelta(hours=24 * gun_say * 5)
+            off_h = {"1h":24,"4h":6,"1d":1,"1wk":1}.get(interval_cfg["interval"], 1)
+            bitis = son_tarih + timedelta(hours=24 * off_h * 5)
 
             for seviye, renk, isim in [
-                (secili_sinyal["Stop"],  "#ef4444", "Stop"),
-                (secili_sinyal["Hedef"], "#22c55e", "Hedef"),
+                (sel_sin["Stop"],  "#ef4444", "Stop"),
+                (sel_sin["Hedef"], "#22c55e", "Hedef"),
             ]:
-                fig.add_shape(
-                    type="line",
-                    x0=son_tarih, x1=bitis, y0=seviye, y1=seviye,
-                    line=dict(color=renk, width=1.5, dash="dash"),
-                    row=1, col=1
-                )
-                fig.add_annotation(
-                    x=bitis, y=seviye,
-                    text=f"{isim} {seviye:.4f}",
-                    showarrow=False,
-                    font=dict(color=renk, size=11),
-                    xanchor="left", row=1, col=1
-                )
+                fig.add_shape(type="line", x0=son_tarih, x1=bitis,
+                              y0=seviye, y1=seviye,
+                              line=dict(color=renk, width=1.5, dash="dash"), row=1, col=1)
+                fig.add_annotation(x=bitis, y=seviye,
+                                   text=f"{isim} {seviye:.4g}",
+                                   showarrow=False, font=dict(color=renk, size=10),
+                                   xanchor="left", row=1, col=1)
 
-            # MACD histogram
-            colors = ["#3fb950" if v >= 0 else "#ef4444" for v in df_grafik["MACD_HIS"]]
-            fig.add_trace(go.Bar(
-                x=df_grafik.index, y=df_grafik["MACD_HIS"],
-                name="MACD His.", marker_color=colors, opacity=0.7
-            ), row=2, col=1)
+            # RSI
+            fig.add_trace(go.Scatter(x=df_grafik.index, y=rsi_g,
+                name="RSI", line=dict(color="#a78bfa", width=1.5)), row=2, col=1)
+            for lvl, clr in [(70,"#ef4444"),(30,"#22c55e"),
+                              (p["rsi_min"],"#fbbf24"),(p["rsi_max"],"#fbbf24")]:
+                fig.add_hline(y=lvl, line_dash="dot", line_color=clr,
+                              line_width=1, row=2, col=1)
             fig.add_trace(go.Scatter(
-                x=df_grafik.index, y=df_grafik["MACD"],
-                name="MACD", line=dict(color="#38bdf8", width=1.5)
+                x=list(df_grafik.index) + list(df_grafik.index[::-1]),
+                y=[p["rsi_max"]]*len(df_grafik) + [p["rsi_min"]]*len(df_grafik),
+                fill="toself", fillcolor="rgba(251,191,36,0.08)",
+                line=dict(width=0), showlegend=False, name="RSI Bant"
             ), row=2, col=1)
-            fig.add_trace(go.Scatter(
-                x=df_grafik.index, y=df_grafik["MACD_SIG"],
-                name="Sinyal", line=dict(color="#f59e0b", width=1.5)
-            ), row=2, col=1)
-            fig.add_hline(y=0, line_dash="dot", line_color="#64748b", row=2, col=1)
 
-            # Son bar çizgisi
-            fig.add_vline(
-                x=son_tarih, line_dash="dot",
-                line_color="#facc15", line_width=1,
-                row="all", col=1
-            )
+            # Hacim
+            vol_colors = ["#22c55e" if float(c_g.iloc[i]) >= float(s(df_grafik["Open"]).iloc[i])
+                          else "#ef4444" for i in range(len(df_grafik))]
+            fig.add_trace(go.Bar(x=df_grafik.index, y=v_g,
+                name="Hacim", marker_color=vol_colors, opacity=0.7), row=3, col=1)
+            fig.add_trace(go.Scatter(x=df_grafik.index, y=hac_g,
+                name="Hac.Ort", line=dict(color="#f59e0b", width=1.5, dash="dash")),
+                row=3, col=1)
 
+            fig.add_vline(x=son_tarih, line_dash="dot",
+                          line_color="#facc15", line_width=1, row="all", col=1)
             fig.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="#0d0f14",
-                plot_bgcolor="#0d0f14",
-                height=650,
-                showlegend=True,
+                template="plotly_dark", paper_bgcolor="#0d0f14",
+                plot_bgcolor="#0d0f14", height=750, showlegend=True,
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=100, t=30, b=10),
+                margin=dict(l=10, r=120, t=40, b=10),
                 font=dict(family="Consolas", size=11),
-                title=dict(text=f"{usdt_goster(secili)} — {son_interval}", font=dict(size=13)),
+                title=dict(text=f"{usdt_goster(secili)} — {son_interval}",
+                           font=dict(size=14)),
             )
             fig.update_yaxes(gridcolor="#1e293b")
             fig.update_xaxes(gridcolor="#1e293b")
-
             st.plotly_chart(fig, use_container_width=True)
 
-            # İşlem özeti
             st.markdown(f"""
 | | |
 |---|---|
 | **Kripto** | {usdt_goster(secili)} |
 | **Zaman Dilimi** | {son_interval} |
-| **Giriş** | ${secili_sinyal['Fiyat']:.6g} |
-| **Stop** | ${secili_sinyal['Stop']:.6g} (-%{secili_sinyal['Stop%']}) |
-| **Hedef** | ${secili_sinyal['Hedef']:.6g} (+%{secili_sinyal['Hedef%']}) |
-| **R:R** | 1:{rr_katsayi:.0f} |
-| **Miktar** | {secili_sinyal['Miktar']:.4f} adet |
-| **Giriş Tutarı** | ${secili_sinyal['Giriş USD']:,.2f} |
-| **Risk** | ${secili_sinyal['Risk USD']:,.2f} |
+| **Giriş** | ${sel_sin['Fiyat']:.6g} |
+| **RSI** | {sel_sin['RSI']} |
+| **Hacim** | {sel_sin['Hac.Kat']}x ortalama |
+| **Stop** | ${sel_sin['Stop']:.6g} (-%{sel_sin['Stop%']}) |
+| **Hedef** | ${sel_sin['Hedef']:.6g} (+%{sel_sin['Hedef%']}) |
+| **R:R** | 1:{p['rr_katsayi']:.0f} |
+| **Miktar** | {sel_sin['Miktar']:.6f} adet |
+| **Giriş Tutarı** | ${sel_sin['Giriş USD']:,.2f} |
+| **Risk** | ${sel_sin['Risk USD']:,.2f} |
 """)
 
-        st.markdown("---")
-        st.caption("⚠️ Bu analiz yatırım tavsiyesi değildir. Kripto piyasaları yüksek risk içerir.")
+    st.markdown("---")
+    st.caption("⚠️ Bu analiz yatırım tavsiyesi değildir. Kripto piyasaları yüksek risk içerir.")
