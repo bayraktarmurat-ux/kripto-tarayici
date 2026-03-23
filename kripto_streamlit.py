@@ -130,15 +130,23 @@ INTERVAL_SECENEKLER = {
 }
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
+def to_series(x):
+    """DataFrame veya MultiIndex sütununu güvenli şekilde 1-boyutlu Series'e çevirir."""
+    if isinstance(x, pd.DataFrame):
+        x = x.iloc[:, 0]
+    if hasattr(x, "squeeze"):
+        x = x.squeeze()
+    if isinstance(x, pd.DataFrame):
+        x = x.iloc[:, 0]
+    return x.astype(float)
+
 def ema(seri, periyot):
-    if hasattr(seri, "squeeze"):
-        seri = seri.squeeze()
-    return seri.ewm(span=periyot, adjust=False).mean()
+    return to_series(seri).ewm(span=periyot, adjust=False).mean()
 
 def atr_hesapla(df, periyot=14):
-    close = df["Close"].squeeze() if hasattr(df["Close"], "squeeze") else df["Close"]
-    high  = df["High"].squeeze()  if hasattr(df["High"],  "squeeze") else df["High"]
-    low   = df["Low"].squeeze()   if hasattr(df["Low"],   "squeeze") else df["Low"]
+    close = to_series(df["Close"])
+    high  = to_series(df["High"])
+    low   = to_series(df["Low"])
     hl = high - low
     hc = (high - close.shift(1)).abs()
     lc = (low  - close.shift(1)).abs()
@@ -165,7 +173,7 @@ def veri_cek(ticker, interval_cfg):
             df.columns = df.columns.get_level_values(0)
         df = df[["Open","High","Low","Close","Volume"]].dropna()
         for col in df.columns:
-            df[col] = df[col].squeeze() if hasattr(df[col], "squeeze") else df[col]
+            df[col] = to_series(df[col])
         # Timezone kaldır (bazı aralıklarda tz-aware gelir)
         if hasattr(df.index, "tz") and df.index.tz is not None:
             df.index = df.index.tz_localize(None)
@@ -216,9 +224,9 @@ def sinyal_tara(df, params):
     df = df.copy()
     for col in ["Open","High","Low","Close","Volume"]:
         if col in df.columns:
-            df[col] = df[col].squeeze() if hasattr(df[col], "squeeze") else df[col]
+            df[col] = to_series(df[col])
 
-    close = df["Close"]
+    close = to_series(df["Close"])
     df["EMA20"]  = ema(close, 20)
     df["EMA50"]  = ema(close, 50)
     df["EMA100"] = ema(close, 100)
@@ -229,7 +237,7 @@ def sinyal_tara(df, params):
     ema_h          = close.ewm(span=macd_hizli,  adjust=False).mean()
     ema_y          = close.ewm(span=macd_yavas,  adjust=False).mean()
     df["MACD"]     = ema_h - ema_y
-    df["MACD_SIG"] = df["MACD"].ewm(span=macd_sinyal, adjust=False).mean()
+    df["MACD_SIG"] = to_series(df["MACD"]).ewm(span=macd_sinyal, adjust=False).mean()
     df["MACD_HIS"] = df["MACD"] - df["MACD_SIG"]
 
     son    = df.iloc[-1]

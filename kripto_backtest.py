@@ -117,22 +117,32 @@ INTERVAL_SECENEKLER = {
 }
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
+def to_series(x):
+    """DataFrame veya MultiIndex sütununu güvenli şekilde 1-boyutlu Series'e çevirir."""
+    if isinstance(x, pd.DataFrame):
+        x = x.iloc[:, 0]
+    if hasattr(x, "squeeze"):
+        x = x.squeeze()
+    if isinstance(x, pd.DataFrame):
+        x = x.iloc[:, 0]
+    return x.astype(float)
+
 def squeeze(s):
-    return s.squeeze() if hasattr(s, "squeeze") else s
+    return to_series(s)
 
 def ema(seri, periyot):
-    return squeeze(seri).ewm(span=periyot, adjust=False).mean()
+    return to_series(seri).ewm(span=periyot, adjust=False).mean()
 
 def hesapla_ind(df, atr_per, macd_h, macd_y, macd_s):
-    c = squeeze(df["Close"])
-    h = squeeze(df["High"])
-    l = squeeze(df["Low"])
+    c = to_series(df["Close"])
+    h = to_series(df["High"])
+    l = to_series(df["Low"])
     for p in [20, 50, 100, 200]:
         df[f"EMA{p}"] = c.ewm(span=p, adjust=False).mean()
     ema_h          = c.ewm(span=macd_h, adjust=False).mean()
     ema_y          = c.ewm(span=macd_y, adjust=False).mean()
     df["MACD"]     = ema_h - ema_y
-    df["MACD_SIG"] = df["MACD"].ewm(span=macd_s, adjust=False).mean()
+    df["MACD_SIG"] = to_series(df["MACD"]).ewm(span=macd_s, adjust=False).mean()
     df["MACD_HIS"] = df["MACD"] - df["MACD_SIG"]
     hl = h - l
     hc = (h - c.shift(1)).abs()
@@ -169,7 +179,7 @@ def veri_cek(ticker, bas, bit, interval_cfg):
             df.columns = df.columns.get_level_values(0)
         df = df[["Open","High","Low","Close","Volume"]].dropna()
         for col in df.columns:
-            df[col] = squeeze(df[col])
+            df[col] = to_series(df[col])
         # Timezone normalize et
         if hasattr(df.index, "tz") and df.index.tz is not None:
             df.index = df.index.tz_localize(None)
@@ -198,7 +208,7 @@ def btc_filtre_olustur(bas, bit, interval_cfg):
             df.columns = df.columns.get_level_values(0)
         if hasattr(df.index, "tz") and df.index.tz is not None:
             df.index = df.index.tz_localize(None)
-        df["EMA200"] = squeeze(df["Close"]).ewm(span=200, adjust=False).mean()
+        df["EMA200"] = to_series(df["Close"]).ewm(span=200, adjust=False).mean()
         df.dropna(subset=["EMA200"], inplace=True)
         # 1h/4h için timestamp, 1d/1w için date kullan
         if interval in ("1h", "4h"):
