@@ -130,18 +130,33 @@ INTERVAL_SECENEKLER = {
 }
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
-def to_series(x):
-    """DataFrame veya MultiIndex sütununu güvenli şekilde 1-boyutlu Series'e çevirir."""
+def to_series(x, idx=None):
+    """
+    Her türlü girişi (DataFrame, MultiIndex, Series, ndarray)
+    düz 1-boyutlu float pandas Series'e çevirir.
+    """
+    import numpy as np
+    # ndarray veya liste ise direkt Series yap
+    if isinstance(x, np.ndarray):
+        return pd.Series(x.flatten(), index=idx)
+    # DataFrame ise ilk sütunu al
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
+    # squeeze ile boyut düşür
     if hasattr(x, "squeeze"):
         x = x.squeeze()
+    # squeeze sonrası hâlâ DataFrame ise
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
-    return x.astype(float)
+    # Son güvence: float Series döndür
+    return pd.Series(x.values.flatten(), index=x.index, dtype=float)
 
 def ema(seri, periyot):
-    return to_series(seri).ewm(span=periyot, adjust=False).mean()
+    s = to_series(seri)
+    return pd.Series(
+        s.ewm(span=periyot, adjust=False).mean().values.flatten(),
+        index=s.index, dtype=float
+    )
 
 def atr_hesapla(df, periyot=14):
     close = to_series(df["Close"])
@@ -151,7 +166,8 @@ def atr_hesapla(df, periyot=14):
     hc = (high - close.shift(1)).abs()
     lc = (low  - close.shift(1)).abs()
     tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
-    return tr.ewm(span=periyot, adjust=False).mean()
+    atr = tr.ewm(span=periyot, adjust=False).mean()
+    return pd.Series(atr.values.flatten(), index=tr.index, dtype=float)
 
 def veri_cek(ticker, interval_cfg):
     """Kripto verisi çeker — semboller zaten BTC-USD formatında"""
@@ -227,18 +243,20 @@ def sinyal_tara(df, params):
             df[col] = to_series(df[col])
 
     close = to_series(df["Close"])
-    df["EMA20"]  = ema(close, 20)
-    df["EMA50"]  = ema(close, 50)
-    df["EMA100"] = ema(close, 100)
-    df["EMA200"] = ema(close, 200)
-    df["ATR"]    = atr_hesapla(df, atr_per)
+    df["EMA20"]  = ema(close, 20).values
+    df["EMA50"]  = ema(close, 50).values
+    df["EMA100"] = ema(close, 100).values
+    df["EMA200"] = ema(close, 200).values
+    df["ATR"]    = atr_hesapla(df, atr_per).values
 
-    # MACD
-    ema_h          = close.ewm(span=macd_hizli,  adjust=False).mean()
-    ema_y          = close.ewm(span=macd_yavas,  adjust=False).mean()
-    df["MACD"]     = ema_h - ema_y
-    df["MACD_SIG"] = to_series(df["MACD"]).ewm(span=macd_sinyal, adjust=False).mean()
-    df["MACD_HIS"] = df["MACD"] - df["MACD_SIG"]
+    # MACD — her adımda .values ile ndarray'e indir, DataFrame oluşmasını engelle
+    ema_h = pd.Series(close.ewm(span=macd_hizli, adjust=False).mean().values.flatten(), index=close.index)
+    ema_y = pd.Series(close.ewm(span=macd_yavas, adjust=False).mean().values.flatten(), index=close.index)
+    macd_line        = ema_h - ema_y
+    macd_sig         = pd.Series(macd_line.ewm(span=macd_sinyal, adjust=False).mean().values.flatten(), index=close.index)
+    df["MACD"]     = macd_line.values
+    df["MACD_SIG"] = macd_sig.values
+    df["MACD_HIS"] = (macd_line - macd_sig).values
 
     son    = df.iloc[-1]
     onceki = df.iloc[-2]

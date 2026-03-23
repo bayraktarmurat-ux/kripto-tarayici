@@ -117,38 +117,51 @@ INTERVAL_SECENEKLER = {
 }
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
-def to_series(x):
-    """DataFrame veya MultiIndex sütununu güvenli şekilde 1-boyutlu Series'e çevirir."""
+def to_series(x, idx=None):
+    """
+    Her türlü girişi (DataFrame, MultiIndex, Series, ndarray)
+    düz 1-boyutlu float pandas Series'e çevirir.
+    """
+    import numpy as np
+    if isinstance(x, np.ndarray):
+        return pd.Series(x.flatten(), index=idx)
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
     if hasattr(x, "squeeze"):
         x = x.squeeze()
     if isinstance(x, pd.DataFrame):
         x = x.iloc[:, 0]
-    return x.astype(float)
+    return pd.Series(x.values.flatten(), index=x.index, dtype=float)
 
 def squeeze(s):
     return to_series(s)
 
 def ema(seri, periyot):
-    return to_series(seri).ewm(span=periyot, adjust=False).mean()
+    s = to_series(seri)
+    return pd.Series(
+        s.ewm(span=periyot, adjust=False).mean().values.flatten(),
+        index=s.index, dtype=float
+    )
 
 def hesapla_ind(df, atr_per, macd_h, macd_y, macd_s):
     c = to_series(df["Close"])
     h = to_series(df["High"])
     l = to_series(df["Low"])
     for p in [20, 50, 100, 200]:
-        df[f"EMA{p}"] = c.ewm(span=p, adjust=False).mean()
-    ema_h          = c.ewm(span=macd_h, adjust=False).mean()
-    ema_y          = c.ewm(span=macd_y, adjust=False).mean()
-    df["MACD"]     = ema_h - ema_y
-    df["MACD_SIG"] = to_series(df["MACD"]).ewm(span=macd_s, adjust=False).mean()
-    df["MACD_HIS"] = df["MACD"] - df["MACD_SIG"]
+        df[f"EMA{p}"] = c.ewm(span=p, adjust=False).mean().values.flatten()
+    ema_h     = pd.Series(c.ewm(span=macd_h, adjust=False).mean().values.flatten(), index=c.index)
+    ema_y     = pd.Series(c.ewm(span=macd_y, adjust=False).mean().values.flatten(), index=c.index)
+    macd_line = ema_h - ema_y
+    macd_sig  = pd.Series(macd_line.ewm(span=macd_s, adjust=False).mean().values.flatten(), index=c.index)
+    df["MACD"]     = macd_line.values
+    df["MACD_SIG"] = macd_sig.values
+    df["MACD_HIS"] = (macd_line - macd_sig).values
     hl = h - l
     hc = (h - c.shift(1)).abs()
     lc = (l - c.shift(1)).abs()
-    df["TR"]  = pd.concat([hl, hc, lc], axis=1).max(axis=1)
-    df["ATR"] = df["TR"].rolling(atr_per).mean()
+    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+    df["TR"]  = tr.values
+    df["ATR"] = tr.rolling(atr_per).mean().values
     return df
 
 def veri_cek(ticker, bas, bit, interval_cfg):
